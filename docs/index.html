@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>metacog — Metacognition Skill for Claude Code</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'Inter','Noto Sans SC',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.7;background:#1a1a2e;color:#e0e0e0}
+
+/* === Color System === */
+.c-cog{--c:#1565c0;--cb:#1a237e;--ct:#90caf9}
+.c-learn{--c:#2e7d32;--cb:#1b5e20;--ct:#a5d6a7}
+.c-dec{--c:#6a1b9a;--cb:#4a148c;--ct:#ce93d8}
+.c-str{--c:#00838f;--cb:#006064;--ct:#80deea}
+.c-fb{--c:#d84315;--cb:#bf360c;--ct:#ffab91}
+.c-rev{--c:#546e7a;--cb:#37474f;--ct:#b0bec5}
+.c-emo{--c:#ad1457;--cb:#880e4f;--ct:#f48fb1}
+.c-com{--c:#ef6c00;--cb:#e65100;--ct:#ffcc80}
+.c-accent{--c:#f9a825;--cb:#f57f17;--ct:#fff8e1}
+
+/* === Layout === */
+.sidebar{position:fixed;top:0;left:0;width:280px;height:100vh;background:#16213e;border-right:1px solid #1f3460;overflow-y:auto;z-index:100;transition:transform .3s}
+.sidebar-header{padding:1.5rem 1.2rem 1rem;border-bottom:1px solid #1f3460}
+.sidebar-header h1{font-size:1.4rem;font-weight:800;color:#f9a825;letter-spacing:-.03em}
+.sidebar-header p{font-size:.72rem;color:#6c7a96;margin-top:.3rem}
+.sidebar nav{padding:.8rem 0}
+.sidebar nav a{display:block;padding:.45rem 1.2rem .45rem 1.5rem;color:#8899b4;font-size:.82rem;text-decoration:none;border-left:3px solid transparent;transition:all .2s}
+.sidebar nav a:hover,.sidebar nav a.active{color:#f9a825;background:rgba(249,168,37,.06);border-left-color:#f9a825}
+.sidebar nav .nav-group{padding:.4rem 1.2rem .2rem;font-size:.68rem;font-weight:700;color:#4a5a7a;text-transform:uppercase;letter-spacing:.08em;margin-top:.6rem}
+.main{margin-left:280px;min-height:100vh}
+.container{max-width:900px;margin:0 auto;padding:0 2rem}
+section{padding:3.5rem 0}
+section:nth-child(even){background:rgba(255,255,255,.02)}
+
+/* === Typography === */
+h2{font-size:1.7rem;font-weight:800;color:#fff;letter-spacing:-.03em;margin-bottom:1.2rem;padding-bottom:.6rem;border-bottom:2px solid #f9a82540}
+h2 .cn{font-size:1rem;font-weight:400;color:#8899b4;margin-left:.6rem}
+h3{font-size:1.15rem;font-weight:700;color:#e0e0e0;margin:1.5rem 0 .6rem}
+h4{font-size:.95rem;font-weight:600;color:#b0bec5;margin:1rem 0 .4rem}
+p{font-size:.88rem;color:#b0bec5;margin-bottom:.8rem}
+strong{color:#e0e0e0}
+code{font-family:'Fira Code','Cascadia Code',Consolas,monospace;font-size:.82em;background:#0d1b36;padding:.15em .4em;border-radius:4px;color:#f9a825}
+pre{background:#0d1b36;border:1px solid #1f3460;border-radius:10px;padding:1rem 1.2rem;overflow-x:auto;margin:1rem 0}
+pre code{background:none;padding:0;font-size:.8rem;color:#b0bec5}
+a{color:#f9a825;text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* === Hero === */
+.hero{background:linear-gradient(135deg,#0f0c29 0%,#302b63 50%,#24243e 100%);padding:4rem 0 3rem;text-align:center;border-bottom:1px solid #f9a82530}
+.hero h1{font-size:3rem;font-weight:800;color:#fff;letter-spacing:-.04em}
+.hero h1 span{color:#f9a825}
+.hero .subtitle{font-size:1.1rem;color:#8899b4;margin:.8rem 0 .3rem}
+.hero .subtitle-cn{font-size:.95rem;color:#6c7a96;margin-bottom:1.8rem}
+.hero .tag-row{display:flex;flex-wrap:wrap;justify-content:center;gap:.5rem;margin-top:1.2rem}
+.hero .tag{padding:.35rem .8rem;border-radius:20px;font-size:.72rem;font-weight:600;color:#fff;border:1px solid rgba(255,255,255,.15)}
+
+/* === Arch Diagram === */
+.arch{display:flex;flex-direction:column;align-items:center;gap:.8rem;margin:2rem 0}
+.arch-router{background:linear-gradient(135deg,#f9a825,#ff6f00);color:#000;padding:.8rem 2rem;border-radius:30px;font-weight:700;font-size:1rem;text-align:center;box-shadow:0 4px 20px #f9a82540}
+.arch-arrow{color:#f9a825;font-size:1.5rem;font-weight:700}
+.arch-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:.6rem;width:100%}
+.arch-card{border-radius:10px;padding:.7rem .8rem;border-left:3px solid var(--c);background:linear-gradient(135deg,var(--cb),#16213e);text-align:center;transition:transform .2s}
+.arch-card:hover{transform:translateY(-3px)}
+.arch-card .name{font-size:.82rem;font-weight:700;color:var(--ct)}
+.arch-card .cn{font-size:.7rem;color:#6c7a96;margin-top:.15rem}
+
+/* === Skill Cards === */
+.skill-card{background:#16213e;border:1px solid #1f3460;border-left:4px solid var(--c);border-radius:12px;padding:1.5rem;margin:1.5rem 0;transition:all .2s}
+.skill-card:hover{border-color:var(--c);box-shadow:0 4px 20px rgba(0,0,0,.3)}
+.skill-card .card-header{display:flex;align-items:center;gap:.8rem;margin-bottom:1rem;cursor:pointer}
+.skill-card .icon{width:42px;height:42px;border-radius:10px;background:var(--c);display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0}
+.skill-card .card-title{font-size:1.1rem;font-weight:700;color:#fff}
+.skill-card .card-title .cn{font-size:.85rem;font-weight:400;color:#8899b4;margin-left:.5rem}
+.skill-card .theory-tag{display:inline-block;padding:.15rem .5rem;border-radius:12px;font-size:.68rem;color:var(--ct);background:var(--cb);margin-right:.3rem;margin-bottom:.3rem}
+.skill-card .card-body{display:none}
+.skill-card.open .card-body{display:block}
+.skill-card .expand-hint{font-size:.7rem;color:#4a5a7a;margin-left:auto}
+
+/* === Flow Diagram === */
+.flow{display:flex;align-items:center;justify-content:center;gap:0;margin:1rem 0}
+.flow-step{padding:.5rem .9rem;border-radius:8px;border:2px solid var(--c);background:var(--cb);font-size:.78rem;font-weight:600;color:var(--ct);text-align:center;min-width:90px}
+.flow-arr{width:40px;text-align:center;font-weight:700;font-size:1.1rem;color:#f9a825}
+
+/* === Output Sections Demo === */
+.output-section{display:flex;flex-wrap:wrap;gap:.4rem;margin:.6rem 0}
+.output-pill{padding:.25rem .6rem;border-radius:6px;font-size:.7rem;background:#0d1b36;border:1px solid #1f3460;color:#8899b4}
+
+/* === Example Box === */
+.example-box{background:#0d1b36;border:1px solid #1f3460;border-radius:10px;padding:1rem 1.2rem;margin:1rem 0}
+.example-box .label{font-size:.68rem;font-weight:700;color:#f9a825;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.5rem}
+.example-box .input{color:#80cbc4;font-family:monospace;font-size:.82rem}
+.example-box .route{color:#f9a825;font-size:.78rem;margin:.4rem 0}
+.example-box .desc{color:#8899b4;font-size:.78rem}
+
+/* === Theory Diagrams === */
+.theory-diagram{background:#0d1b36;border:1px solid #1f3460;border-radius:14px;padding:1.5rem;margin:1.5rem 0}
+.theory-diagram .title{font-size:.95rem;font-weight:700;color:#fff;margin-bottom:1rem;text-align:center}
+
+/* Monitor-Control */
+.mc-model{display:flex;flex-direction:column;align-items:center;gap:.3rem}
+.mc-level{width:80%;padding:1rem;border-radius:12px;text-align:center;position:relative}
+.mc-meta{background:linear-gradient(135deg,#1a237e,#283593);border:2px solid #3f51b5;color:#90caf9}
+.mc-object{background:linear-gradient(135deg,#1b5e20,#2e7d32);border:2px solid #4caf50;color:#a5d6a7}
+.mc-arrows{display:flex;justify-content:space-around;width:80%;padding:.2rem 2rem}
+.mc-arrows span{font-size:.75rem;color:#8899b4}
+.mc-arrows .arr{font-size:1.3rem;color:#f9a825}
+
+/* Dual System */
+.dual-sys{display:grid;grid-template-columns:1fr 60px 1fr;gap:0;align-items:center}
+.sys-box{padding:1.2rem;border-radius:12px;text-align:center}
+.sys1{background:linear-gradient(135deg,#e65100,#bf360c);border:2px solid #ff6f00;color:#ffcc80}
+.sys2{background:linear-gradient(135deg,#1a237e,#0d47a1);border:2px solid #1565c0;color:#90caf9}
+.sys-vs{text-align:center;font-size:1.5rem;font-weight:800;color:#f9a825}
+.sys-box .sys-title{font-size:1rem;font-weight:700;margin-bottom:.5rem}
+.sys-box .sys-attr{font-size:.72rem;margin:.2rem 0}
+
+/* Four Sides */
+.four-sides{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr auto 1fr;gap:.6rem;max-width:500px;margin:0 auto}
+.fs-center{grid-column:1/3;text-align:center;padding:.8rem;background:linear-gradient(135deg,#f9a825,#ff6f00);border-radius:12px;color:#000;font-weight:700;font-size:.9rem}
+.fs-box{padding:.8rem;border-radius:10px;text-align:center;border:2px solid var(--c)}
+.fs-box .fs-label{font-size:.75rem;font-weight:700;color:var(--ct)}
+.fs-box .fs-desc{font-size:.68rem;color:#8899b4;margin-top:.2rem}
+
+/* Double Loop */
+.loop-diagram{display:flex;flex-direction:column;gap:1rem;align-items:center}
+.loop-row{display:flex;align-items:center;gap:.5rem;width:100%}
+.loop-box{padding:.6rem 1rem;border-radius:8px;font-size:.78rem;font-weight:600;text-align:center;flex:1}
+.loop-single{background:#37474f;border:2px solid #546e7a;color:#b0bec5}
+.loop-double{background:#4a148c;border:2px solid #7b1fa2;color:#ce93d8}
+.loop-label{font-size:.7rem;color:#8899b4;width:100px;text-align:right;flex-shrink:0}
+.loop-arr-d{color:#f9a825;font-weight:700;font-size:1rem;text-align:center}
+
+/* === Diff Table === */
+.diff-table{width:100%;border-collapse:collapse;margin:1rem 0;font-size:.82rem}
+.diff-table th{background:#1f3460;color:#f9a825;padding:.6rem .8rem;text-align:left;font-weight:600;border-bottom:2px solid #f9a82540}
+.diff-table td{padding:.5rem .8rem;border-bottom:1px solid #1f3460;color:#b0bec5}
+.diff-table tr:hover td{background:rgba(249,168,37,.04)}
+
+/* === Anti-Pattern Cards === */
+.ap-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:1rem;margin:1rem 0}
+.ap-card{background:#16213e;border:1px solid #1f3460;border-radius:10px;padding:1rem;border-top:3px solid #c62828}
+.ap-card .ap-name{font-size:.88rem;font-weight:700;color:#ef5350;margin-bottom:.5rem}
+.ap-card .bad{font-size:.78rem;color:#ef9a9a;margin:.3rem 0;padding:.3rem .5rem;background:#3e2723;border-radius:6px}
+.ap-card .good{font-size:.78rem;color:#a5d6a7;margin:.3rem 0;padding:.3rem .5rem;background:#1b5e20;border-radius:6px}
+
+/* === Design Cards === */
+.design-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin:1rem 0}
+.design-card{background:#16213e;border:1px solid #1f3460;border-radius:10px;padding:1.2rem;border-left:3px solid #f9a825}
+.design-card .num{font-size:1.5rem;font-weight:800;color:#f9a825;margin-bottom:.3rem}
+.design-card .d-title{font-size:.92rem;font-weight:700;color:#fff;margin-bottom:.4rem}
+.design-card .d-desc{font-size:.78rem;color:#8899b4}
+
+/* === Output Contract === */
+.contract-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.6rem;margin:1rem 0}
+.contract-item{background:#0d1b36;border:1px solid #1f3460;border-radius:8px;padding:.8rem;text-align:center}
+.contract-item .ci-icon{font-size:1.3rem;margin-bottom:.3rem}
+.contract-item .ci-label{font-size:.75rem;font-weight:600;color:#e0e0e0}
+.contract-item .ci-desc{font-size:.68rem;color:#6c7a96;margin-top:.2rem}
+
+/* === Refs === */
+.ref-group{margin:1.2rem 0}
+.ref-group h4{color:#f9a825;font-size:.85rem;margin-bottom:.5rem}
+.ref-item{font-size:.78rem;color:#8899b4;padding:.3rem 0;padding-left:1rem;border-left:2px solid #1f3460}
+
+/* === Mobile toggle === */
+.menu-toggle{display:none;position:fixed;top:.8rem;left:.8rem;z-index:200;background:#f9a825;color:#000;border:none;border-radius:8px;padding:.5rem .7rem;font-size:1rem;cursor:pointer;font-weight:700}
+
+/* === Responsive === */
+@media(max-width:768px){
+  .sidebar{transform:translateX(-100%)}
+  .sidebar.open{transform:translateX(0)}
+  .main{margin-left:0}
+  .menu-toggle{display:block}
+  .container{padding:0 1rem}
+  .hero h1{font-size:2rem}
+  .arch-grid{grid-template-columns:repeat(2,1fr)}
+  .design-grid{grid-template-columns:1fr}
+  .dual-sys{grid-template-columns:1fr;gap:.5rem}
+  .sys-vs{display:none}
+  .four-sides{grid-template-columns:1fr}
+  .four-sides .fs-center{grid-column:1}
+  .flow{flex-wrap:wrap}
+}
+
+/* === Scrollbar === */
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:#0f0c29}
+::-webkit-scrollbar-thumb{background:#1f3460;border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:#f9a825}
+
+/* === Print === */
+@media print{
+  .sidebar,.menu-toggle{display:none!important}
+  .main{margin-left:0!important}
+  body{background:#fff;color:#222}
+  h2{color:#222;border-bottom-color:#ccc}
+  .skill-card,.theory-diagram,.example-box{border-color:#ccc;background:#f8f8f8}
+  .skill-card .card-body{display:block!important}
+  .hero{background:#fff;color:#222}
+  .hero h1,.hero h1 span{color:#222}
+  p,td,.ref-item{color:#444}
+}
+</style>
+</head>
+<body>
+
+<button class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">&#9776;</button>
+
+<!-- ===== SIDEBAR ===== -->
+<div class="sidebar">
+  <div class="sidebar-header">
+    <h1>metacog</h1>
+    <p>Metacognition Skill for Claude Code</p>
+  </div>
+  <nav>
+    <a href="#intro">Introduction | 项目简介</a>
+    <a href="#quickstart">Quick Start | 快速上手</a>
+
+    <div class="nav-group">Skills Reference | 技能手册</div>
+    <a href="#skill-cognition">&nbsp;&nbsp;cognition 元认知</a>
+    <a href="#skill-learning">&nbsp;&nbsp;learning 元学习</a>
+    <a href="#skill-decision">&nbsp;&nbsp;decision 元决策</a>
+    <a href="#skill-structure">&nbsp;&nbsp;structure 元结构</a>
+    <a href="#skill-feedback">&nbsp;&nbsp;feedback 元反馈</a>
+    <a href="#skill-review">&nbsp;&nbsp;review 元复盘</a>
+    <a href="#skill-emotion">&nbsp;&nbsp;emotion 元情绪</a>
+    <a href="#skill-communication">&nbsp;&nbsp;communication 元沟通</a>
+
+    <div class="nav-group">Theory | 理论基础</div>
+    <a href="#theory-monitor">&nbsp;&nbsp;Monitor-Control</a>
+    <a href="#theory-dual">&nbsp;&nbsp;Dual Process</a>
+    <a href="#theory-flavell">&nbsp;&nbsp;Flavell Taxonomy</a>
+    <a href="#theory-gottman">&nbsp;&nbsp;Meta-Emotion</a>
+    <a href="#theory-foursides">&nbsp;&nbsp;Four-Sides Model</a>
+    <a href="#theory-doubleloop">&nbsp;&nbsp;Double-Loop Learning</a>
+
+    <a href="#design">Design Philosophy | 设计哲学</a>
+    <a href="#antipatterns">Anti-Patterns | 反模式</a>
+    <a href="#references">References | 参考文献</a>
+  </nav>
+</div>
+
+<!-- ===== MAIN ===== -->
+<div class="main">
+
+<!-- HERO -->
+<section class="hero" id="intro">
+  <div class="container">
+    <h1><span>metacog</span></h1>
+    <p class="subtitle">Metacognition Skill for Claude Code</p>
+    <p class="subtitle-cn">让 AI 从「答案生成器」升级为「认知操作系统」</p>
+    <div class="tag-row">
+      <span class="tag c-cog" style="background:var(--c)">cognition</span>
+      <span class="tag c-learn" style="background:var(--c)">learning</span>
+      <span class="tag c-dec" style="background:var(--c)">decision</span>
+      <span class="tag c-str" style="background:var(--c)">structure</span>
+      <span class="tag c-fb" style="background:var(--c)">feedback</span>
+      <span class="tag c-rev" style="background:var(--c)">review</span>
+      <span class="tag c-emo" style="background:var(--c)">emotion</span>
+      <span class="tag c-com" style="background:var(--c)">communication</span>
+    </div>
+
+    <!-- Architecture Diagram -->
+    <div class="arch" style="margin-top:2.5rem">
+      <div class="arch-router">/metacog your question</div>
+      <div class="arch-arrow">&#8595;</div>
+      <div style="background:#f9a82520;border:1px solid #f9a82540;border-radius:12px;padding:.8rem;font-size:.78rem;color:#f9a825;font-weight:600">Router | Auto-detect intent or parse keyword</div>
+      <div class="arch-arrow">&#8595;</div>
+      <div class="arch-grid">
+        <div class="arch-card c-cog"><div class="name">cognition</div><div class="cn">元认知</div></div>
+        <div class="arch-card c-learn"><div class="name">learning</div><div class="cn">元学习</div></div>
+        <div class="arch-card c-dec"><div class="name">decision</div><div class="cn">元决策</div></div>
+        <div class="arch-card c-str"><div class="name">structure</div><div class="cn">元结构</div></div>
+        <div class="arch-card c-fb"><div class="name">feedback</div><div class="cn">元反馈</div></div>
+        <div class="arch-card c-rev"><div class="name">review</div><div class="cn">元复盘</div></div>
+        <div class="arch-card c-emo"><div class="name">emotion</div><div class="cn">元情绪</div></div>
+        <div class="arch-card c-com"><div class="name">communication</div><div class="cn">元沟通</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WHAT IS THIS -->
+<section>
+  <div class="container">
+    <h2>What is metacog?<span class="cn">这是什么？</span></h2>
+    <p><strong>metacog</strong> is a single Claude Code skill that packs 8 metacognitive capabilities into one <code>/metacog</code> command. Instead of just answering your questions, it helps you <strong>think better about thinking itself</strong>.</p>
+    <p>大多数 AI 交互是：用户提问 → AI 回答。但真正的瓶颈往往不是"答案是什么"，而是<strong>"我问对问题了吗？"</strong> metacog 反转了这个模式：分析思维过程本身，帮用户升级认知能力。</p>
+
+    <h3>Output Contract | 输出规范</h3>
+    <div class="contract-grid">
+      <div class="contract-item"><div class="ci-icon">&#127760;</div><div class="ci-label">Bilingual Headers</div><div class="ci-desc">### EN | 中文</div></div>
+      <div class="contract-item"><div class="ci-icon">&#127919;</div><div class="ci-label">Confidence 1-10</div><div class="ci-desc">Anti Dunning-Kruger</div></div>
+      <div class="contract-item"><div class="ci-icon">&#128161;</div><div class="ci-label">Reusable Principle</div><div class="ci-desc">Transferable insight</div></div>
+      <div class="contract-item"><div class="ci-icon">&#127463;</div><div class="ci-label">Language-adaptive</div><div class="ci-desc">Follows user input</div></div>
+      <div class="contract-item"><div class="ci-icon">&#128683;</div><div class="ci-label">Anti-flattery</div><div class="ci-desc">Substance only</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- QUICK START -->
+<section id="quickstart">
+  <div class="container">
+    <h2>Quick Start<span class="cn">快速上手</span></h2>
+
+    <h3>Installation | 安装</h3>
+    <pre><code># Personal (all projects) | 个人级（所有项目可用）
+mkdir -p ~/.claude/skills/metacog
+cp SKILL.md ~/.claude/skills/metacog/
+
+# Project-level (this project only) | 项目级
+mkdir -p .claude/skills/metacog
+cp SKILL.md .claude/skills/metacog/</code></pre>
+    <p>Restart Claude Code after installation. 安装后重启 Claude Code。</p>
+
+    <h3>3 Usage Modes | 三种使用方式</h3>
+
+    <div class="example-box">
+      <div class="label">Mode 1: Auto-Route | 自动路由</div>
+      <div class="input">/metacog 我每天学8小时但考试成绩很差</div>
+      <div class="route">Routing &#8594; learning | 元学习</div>
+      <div class="desc">Analyzes study method, identifies fluency illusion, designs better path</div>
+    </div>
+
+    <div class="example-box">
+      <div class="label">Mode 2: Explicit Keyword | 指定关键词</div>
+      <div class="input">/metacog decision Should I quit to start a business?</div>
+      <div class="route">&#8594; Directly executes decision skill</div>
+      <div class="desc">Decision principles, trade-off matrix, pre-mortem, fallback plan</div>
+    </div>
+
+    <div class="example-box">
+      <div class="label">Mode 3: All Mode | 全能模式</div>
+      <div class="input">/metacog all 我一看到任务就焦虑然后一直拖</div>
+      <div class="route">&#8594; Runs emotion + cognition + feedback, then synthesizes</div>
+      <div class="desc">Names anxiety, traces avoidance loop, gives concrete action rules, integrates insights</div>
+    </div>
+  </div>
+</section>
+
+<!-- SKILLS REFERENCE -->
+<section id="skills">
+  <div class="container">
+    <h2>Skills Reference<span class="cn">技能手册</span></h2>
+    <p>Click any skill card to expand details. 点击展开详情。</p>
+
+    <!-- COGNITION -->
+    <div class="skill-card c-cog" id="skill-cognition" onclick="this.classList.toggle('open')">
+      <div class="card-header">
+        <div class="icon">&#128269;</div>
+        <div>
+          <div class="card-title">cognition<span class="cn">元认知</span></div>
+          <div><span class="theory-tag">Flavell 1979</span><span class="theory-tag">Dunning-Kruger</span><span class="theory-tag">Nelson & Narens</span></div>
+        </div>
+        <span class="expand-hint">&#9660; click to expand</span>
+      </div>
+      <div class="card-body">
+        <p>Diagnoses <strong>HOW</strong> the user thinks, not just WHAT. Identifies specific cognitive biases, logic gaps, and blind spots with falsifiable corrections.</p>
+        <h4>Process Flow</h4>
+        <div class="flow c-cog">
+          <div class="flow-step" style="border-color:var(--c);background:var(--cb);color:var(--ct)">Monitor</div>
+          <div class="flow-arr">&#8594;</div>
+          <div class="flow-step" style="border-color:var(--c);background:var(--cb);color:var(--ct)">Evaluate</div>
+          <div class="flow-arr">&#8594;</div>
+          <div class="flow-step" style="border-color:var(--c);background:var(--cb);color:var(--ct)">Regulate</div>
+        </div>
+        <h4>Output Sections</h4>
+        <div class="output-section">
+          <span class="output-pill">Problem Essence | 问题本质</span>
+          <span class="output-pill">Cognitive Blind Spots | 认知盲区</span>
+          <span class="output-pill">Logic Gaps | 逻辑漏洞</span>
+          <span class="output-pill">Corrective Direction | 修正方向</span>
+        </div>
+        <div class="example-box">
+          <div class="label">Example</div>
+          <div class="input">/metacog 我觉得这个项目一定能成功，因为我已经投入了半年时间</div>
+          <div class="desc">Identifies sunk cost fallacy; questions evidence for "certain success"; separates effort invested from probability of success</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LEARNING -->
+    <div class="skill-card c-learn" id="skill-learning" onclick="this.classList.toggle('open')">
+      <div class="card-header">
+        <div class="icon">&#128218;</div>
+        <div>
+          <div class="card-title">learning<span class="cn">元学习</span></div>
+          <div><span class="theory-tag">Feynman</span><span class="theory-tag">Pareto 80/20</span><span class="theory-tag">Ericsson</span></div>
+        </div>
+        <span class="expand-hint">&#9660; click to expand</span>
+      </div>
+      <div class="card-body">
+        <p>Designs <strong>HOW</strong> to learn, not just WHAT. Finds the critical 20% knowledge, builds paths with Feynman-style checkpoints, and creates transfer strategies.</p>
+        <h4>Process Flow</h4>
+        <div class="flow c-learn">
+          <div class="flow-step" style="border-color:var(--c);background:var(--cb);color:var(--ct)">Map</div>
+          <div class="flow-arr">&#8594;</div>
+          <div class="flow-step" style="border-color:var(--c);background:var(--cb);color:var(--ct)">Path</div>
+          <div class="flow-arr">&#8594;</div>
+          <div class="flow-step" style="border-color:var(--c);background:var(--cb);color:var(--ct)">Transfer</div>
+        </div>
+        <h4>Output Sections</h4>
+        <div class="output-section">
+          <span class="output-pill">Core Framework | 核心框架</span>
+          <span class="output-pill">Learning Path | 学习路径</span>
+          <span class="output-pill">Review Strategy | 复盘策略</span>
+          <span class="output-pill">Transfer Techniques | 迁移技巧</span>
+        </div>
+        <div class="example-box">
+          <div class="label">Example</div>
+          <div class="input">/metacog learning I want to learn distributed systems</div>
+          <div class="desc">Maps domain primitives (CAP theorem, consensus, replication); identifies Pareto 20% (consensus algorithms, failure modes); creates path with checkpoints</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DECISION -->
+    <div class="skill-card c-dec" id="skill-decision" onclick="this.classList.toggle('open')">
+      <div class="card-header">
+        <div class="icon">&#9878;</div>
+        <div>
+          <div class="card-title">decision<span class="cn">元决策</span></div>
+          <div><span class="theory-tag">Kahneman</span><span class="theory-tag">Prospect Theory</span><span class="theory-tag">Pre-mortem</span></div>
+        </div>
+        <span class="expand-hint">&#9660; click to expand</span>
+      </div>
+      <div class="card-body">
+        <p>Builds the <strong>decision framework</strong> before analyzing options. Decomposes trade-offs including hidden costs and second-order effects, runs pre-mortems.</p>
+        <h4>Process Flow</h4>
+        <div class="flow c-dec">
+          <div class="flow-step" style="border-color:var(--c);background:var(--cb);color:var(--ct)">Frame</div>
+          <div class="flow-arr">&#8594;</div>
+          <div class="flow-step" style="border-color:var(--c);background:var(--cb);color:var(--ct)">Analyze</div>
+          <div class="flow-arr">&#8594;</div>
+          <div class="flow-step" style="border-color:var(--c);background:var(--cb);color:var(--ct)">Decide</div>
+        </div>
+        <h4>Output Sections</h4>
+        <div class="output-section">
+          <span class="output-pill">Decision Principles | 决策原则</span>
+          <span class="output-pill">Trade-off Analysis | 利弊权衡</span>
+          <span class="output-pill">Risk Warning | 风险预警</span>
+          <span class="output-pill">Optimal Decision | 最优决策</span>
+          <span class="output-pill">Fallback | 兜底方案</span>
+        </div>
+        <div class="example-box">
+          <div class="label">Example</div>
+          <div class="input">/metacog 我在考虑要不要辞职去创业</div>
+          <div class="desc">Surfaces hidden costs (network loss, identity shift); detects optimism bias and survivorship bias; runs pre-mortem for 18-month failure scenario</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STRUCTURE -->
+    <div class="skill-card c-str" id="skill-structure" onclick="this.classList.toggle('open')">
+      <div class="card-header">
+        <div class="icon">&#127959;</div>
+        <div>
+          <div class="card-title">structure<span class="cn">元结构</span></div>
+          <div><span class="theory-tag">MECE</span><span class="theory-tag">Pyramid Principle</span></div>
+        </div>
+        <span class="expand-hint">&#9660; click to expand</span>
+      </div>
+      <div class="card-body">
+        <p>Extracts the <strong>logical skeleton</strong> of information. Applies MECE decomposition and Pyramid Principle for clear hierarchy.</p>
+        <h4>Process Flow</h4>
+        <div class="flow c-str">
+          <div class="flow-step" style="border-color:var(--c);background:var(--cb);color:var(--ct)">Extract</div>
+          <div class="flow-arr">&#8594;</div>
+          <div class="flow-step" style="border-color:var(--c);background:var(--cb);color:var(--ct)">Architect</div>
+          <div class="flow-arr">&#8594;</div>
+          <div class="flow-step" style="border-color:var(--c);background:var(--cb);color:var(--ct)">Validate</div>
+        </div>
+        <h4>Output Sections</h4>
+        <div class="output-section">
+          <span class="output-pill">Core Structure | 核心结构</span>
+          <span class="output-pill">Hierarchical Decomposition | 层级拆分</span>
+          <span class="output-pill">Key Points | 关键要点</span>
+          <span class="output-pill">Logic Closure | 逻辑闭环</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- FEEDBACK -->
+    <div class="skill-card c-fb" id="skill-feedback" onclick="this.classList.toggle('open')">
+      <div class="card-header">
+        <div class="icon">&#127919;</div>
+        <div>
+          <div class="card-title">feedback<span class="cn">元反馈</span></div>
+          <div><span class="theory-tag">Nelson & Narens</span><span class="theory-tag">Deliberate Practice</span></div>
+        </div>
+        <span class="expand-hint">&#9660; click to expand</span>
+      </div>
+      <div class="card-body">
+        <p>Delivers <strong>fact-based, causal-chain feedback</strong>. Traces behavior &#8594; mechanism &#8594; outcome and locates the broken link.</p>
+        <h4>Process Flow</h4>
+        <div class="flow c-fb">
+          <div class="flow-step" style="border-color:var(--c);background:var(--cb);color:var(--ct)">Assess</div>
+          <div class="flow-arr">&#8594;</div>
+          <div class="flow-step" style="border-color:var(--c);background:var(--cb);color:var(--ct)">Diagnose</div>
+          <div class="flow-arr">&#8594;</div>
+          <div class="flow-step" style="border-color:var(--c);background:var(--cb);color:var(--ct)">Prescribe</div>
+        </div>
+        <h4>Output Sections</h4>
+        <div class="output-section">
+          <span class="output-pill">Factual Assessment | 事实判断</span>
+          <span class="output-pill">Root Cause | 问题根源</span>
+          <span class="output-pill">Optimization Direction | 优化方向</span>
+          <span class="output-pill">Action Rules | 行动规则</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- REVIEW -->
+    <div class="skill-card c-rev" id="skill-review" onclick="this.classList.toggle('open')">
+      <div class="card-header">
+        <div class="icon">&#128260;</div>
+        <div>
+          <div class="card-title">review<span class="cn">元复盘</span></div>
+          <div><span class="theory-tag">Reflexion</span><span class="theory-tag">5 Whys</span><span class="theory-tag">Double-Loop</span></div>
+        </div>
+        <span class="expand-hint">&#9660; click to expand</span>
+      </div>
+      <div class="card-body">
+        <p>Extracts <strong>reusable operating rules</strong> from past events. 5 Whys to root causes, double-loop to question mental models, outputs actionable SOPs.</p>
+        <h4>Process Flow</h4>
+        <div class="flow c-rev">
+          <div class="flow-step" style="border-color:var(--c);background:var(--cb);color:var(--ct)">Reconstruct</div>
+          <div class="flow-arr">&#8594;</div>
+          <div class="flow-step" style="border-color:var(--c);background:var(--cb);color:var(--ct)">Diagnose</div>
+          <div class="flow-arr">&#8594;</div>
+          <div class="flow-step" style="border-color:var(--c);background:var(--cb);color:var(--ct)">Extract</div>
+        </div>
+        <h4>Output Sections</h4>
+        <div class="output-section">
+          <span class="output-pill">Factual Outcome | 结果事实</span>
+          <span class="output-pill">What Worked / Failed | 正确 / 错误</span>
+          <span class="output-pill">Root Cause | 根本原因</span>
+          <span class="output-pill">Iteration SOP | 迭代SOP</span>
+        </div>
+        <div class="example-box">
+          <div class="label">Example</div>
+          <div class="input">/metacog review 这个项目从立项到烂尾用了6个月</div>
+          <div class="desc">5 Whys: delay &#8592; frequent requirement changes &#8592; unclear initial requirements &#8592; no validation &#8592; mental model "client is always right" &#8594; Double-loop fix</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- EMOTION -->
+    <div class="skill-card c-emo" id="skill-emotion" onclick="this.classList.toggle('open')">
+      <div class="card-header">
+        <div class="icon">&#128161;</div>
+        <div>
+          <div class="card-title">emotion<span class="cn">元情绪</span></div>
+          <div><span class="theory-tag">Gottman</span><span class="theory-tag">Gross</span><span class="theory-tag">Slovic</span></div>
+        </div>
+        <span class="expand-hint">&#9660; click to expand</span>
+      </div>
+      <div class="card-body">
+        <p>Makes <strong>emotions legible as data</strong>. Precisely names emotions, detects affect heuristic distortion, separates signal from noise, provides cognitive reappraisal strategies. Not therapy.</p>
+        <h4>Process Flow</h4>
+        <div class="flow c-emo">
+          <div class="flow-step" style="border-color:var(--c);background:var(--cb);color:var(--ct)">Identify</div>
+          <div class="flow-arr">&#8594;</div>
+          <div class="flow-step" style="border-color:var(--c);background:var(--cb);color:var(--ct)">Analyze</div>
+          <div class="flow-arr">&#8594;</div>
+          <div class="flow-step" style="border-color:var(--c);background:var(--cb);color:var(--ct)">Reappraise</div>
+        </div>
+        <h4>Output Sections</h4>
+        <div class="output-section">
+          <span class="output-pill">Emotion Identification | 情绪识别</span>
+          <span class="output-pill">Emotional Distortion | 情绪扭曲分析</span>
+          <span class="output-pill">Signal vs Noise | 信号与噪声</span>
+          <span class="output-pill">Reappraisal Strategy | 认知重评策略</span>
+          <span class="output-pill">Grounded Next Step | 落地下一步</span>
+        </div>
+        <div class="example-box">
+          <div class="label">Example</div>
+          <div class="input">/metacog 我一看到那个任务就焦虑，然后就一直拖</div>
+          <div class="desc">Identifies anxiety + shame; traces vicious cycle (anxiety &#8594; avoidance &#8594; more anxiety); separates signal (task difficulty) from noise (perfectionism); reframes to "try 15 minutes"</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- COMMUNICATION -->
+    <div class="skill-card c-com" id="skill-communication" onclick="this.classList.toggle('open')">
+      <div class="card-header">
+        <div class="icon">&#128483;</div>
+        <div>
+          <div class="card-title">communication<span class="cn">元沟通</span></div>
+          <div><span class="theory-tag">Bateson</span><span class="theory-tag">Watzlawick</span><span class="theory-tag">Four-Sides</span><span class="theory-tag">NVC</span></div>
+        </div>
+        <span class="expand-hint">&#9660; click to expand</span>
+      </div>
+      <div class="card-body">
+        <p>Decodes <strong>what is really being communicated</strong> beneath the words. Surfaces meta-messages, diagnoses patterns, identifies intent-impact gaps, provides concrete alternative phrasing.</p>
+        <h4>Process Flow</h4>
+        <div class="flow c-com">
+          <div class="flow-step" style="border-color:var(--c);background:var(--cb);color:var(--ct)">Decode</div>
+          <div class="flow-arr">&#8594;</div>
+          <div class="flow-step" style="border-color:var(--c);background:var(--cb);color:var(--ct)">Diagnose</div>
+          <div class="flow-arr">&#8594;</div>
+          <div class="flow-step" style="border-color:var(--c);background:var(--cb);color:var(--ct)">Redesign</div>
+        </div>
+        <h4>Output Sections</h4>
+        <div class="output-section">
+          <span class="output-pill">Surface vs Meta-Message | 表层 vs 元信息</span>
+          <span class="output-pill">Pattern Diagnosis | 沟通模式诊断</span>
+          <span class="output-pill">Intent-Impact Gap | 意图-效果偏差</span>
+          <span class="output-pill">Strategic Recommendation | 沟通策略</span>
+          <span class="output-pill">Suggested Phrasing | 建议话术</span>
+        </div>
+        <div class="example-box">
+          <div class="label">Example</div>
+          <div class="input">/metacog 我老板说"你看着办"但我怎么做他都不满意</div>
+          <div class="desc">Four-sides: factual=handle it / self-revelation=uncertain / relationship=read my mind / appeal=match my unstated standard. Pattern: double bind. Gives concrete phrasing to break the loop.</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- THEORY -->
+<section id="theory">
+  <div class="container">
+    <h2>Theoretical Foundations<span class="cn">理论基础</span></h2>
+    <p>metacog is grounded in established academic frameworks, not vibes. Every skill maps to peer-reviewed research.</p>
+    <p>metacog 基于成熟的学术框架，每项技能都有经过同行评审的研究支撑。</p>
+
+    <!-- Monitor-Control -->
+    <div class="theory-diagram" id="theory-monitor">
+      <div class="title">Nelson & Narens Monitor-Control Model (1990)<br><span style="font-size:.78rem;color:#8899b4">The operating backbone of the entire system | 系统核心操作模型</span></div>
+      <div class="mc-model">
+        <div class="mc-level mc-meta">
+          <strong style="font-size:.95rem">Meta-Level | 元层级</strong>
+          <div style="font-size:.75rem;margin-top:.3rem">Model of the cognitive process<br>对认知过程的模型</div>
+        </div>
+        <div class="mc-arrows">
+          <span><span class="arr">&#8593;</span><br>Monitoring 监控<br><span style="font-size:.65rem">"How am I doing?"</span></span>
+          <span><span class="arr">&#8595;</span><br>Control 控制<br><span style="font-size:.65rem">"Switch strategy"</span></span>
+        </div>
+        <div class="mc-level mc-object">
+          <strong style="font-size:.95rem">Object-Level | 对象层级</strong>
+          <div style="font-size:.75rem;margin-top:.3rem">Actual cognitive activity<br>实际认知活动</div>
+        </div>
+      </div>
+      <p style="margin-top:1rem;font-size:.78rem;text-align:center;color:#6c7a96">Every metacog skill follows this pattern: first Monitor the user's thinking, then provide Control actions.</p>
+    </div>
+
+    <!-- Dual Process -->
+    <div class="theory-diagram" id="theory-dual">
+      <div class="title">Kahneman's Dual Process Theory (2011)<br><span style="font-size:.78rem;color:#8899b4">Why we need metacognition | 为什么需要元认知</span></div>
+      <div class="dual-sys">
+        <div class="sys-box sys1">
+          <div class="sys-title">System 1 | 系统1</div>
+          <div class="sys-attr">&#9889; Fast | 快速</div>
+          <div class="sys-attr">&#9881; Automatic | 自动</div>
+          <div class="sys-attr">&#128161; Intuitive | 直觉</div>
+          <div class="sys-attr">&#9888; Error-prone | 易出错</div>
+        </div>
+        <div class="sys-vs">VS</div>
+        <div class="sys-box sys2">
+          <div class="sys-title">System 2 | 系统2</div>
+          <div class="sys-attr">&#128034; Slow | 缓慢</div>
+          <div class="sys-attr">&#127919; Deliberate | 刻意</div>
+          <div class="sys-attr">&#129504; Rational | 理性</div>
+          <div class="sys-attr">&#128267; Energy-consuming | 耗能</div>
+        </div>
+      </div>
+      <p style="margin-top:1rem;font-size:.78rem;text-align:center;color:#6c7a96">Metacognition = using System 2 to audit System 1 | 元认知 = 用系统2审视系统1</p>
+    </div>
+
+    <!-- Flavell -->
+    <div class="theory-diagram" id="theory-flavell">
+      <div class="title">Flavell's Metacognition Taxonomy (1979)<br><span style="font-size:.78rem;color:#8899b4">Three dimensions of metacognition | 元认知三维模型</span></div>
+      <div style="display:flex;gap:.8rem;justify-content:center;flex-wrap:wrap">
+        <div style="flex:1;min-width:200px;padding:1rem;border-radius:10px;background:linear-gradient(135deg,#1a237e,#283593);border:2px solid #3f51b5;text-align:center">
+          <div style="font-size:.88rem;font-weight:700;color:#90caf9">Metacognitive Knowledge</div>
+          <div style="font-size:.72rem;color:#7986cb;margin-top:.3rem">元认知知识</div>
+          <div style="font-size:.72rem;color:#9fa8da;margin-top:.5rem">About person, task, strategy<br>关于人、任务、策略的知识</div>
+        </div>
+        <div style="flex:1;min-width:200px;padding:1rem;border-radius:10px;background:linear-gradient(135deg,#1b5e20,#2e7d32);border:2px solid #4caf50;text-align:center">
+          <div style="font-size:.88rem;font-weight:700;color:#a5d6a7">Metacognitive Experience</div>
+          <div style="font-size:.72rem;color:#81c784;margin-top:.3rem">元认知体验</div>
+          <div style="font-size:.72rem;color:#a5d6a7;margin-top:.5rem">Subjective feeling during cognition<br>"我好像不太懂"</div>
+        </div>
+        <div style="flex:1;min-width:200px;padding:1rem;border-radius:10px;background:linear-gradient(135deg,#4a148c,#6a1b9a);border:2px solid #9c27b0;text-align:center">
+          <div style="font-size:.88rem;font-weight:700;color:#ce93d8">Metacognitive Monitoring</div>
+          <div style="font-size:.72rem;color:#ba68c8;margin-top:.3rem">元认知监控</div>
+          <div style="font-size:.72rem;color:#ce93d8;margin-top:.5rem">Real-time tracking of cognitive state<br>实时追踪认知状态</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gottman -->
+    <div class="theory-diagram" id="theory-gottman">
+      <div class="title">Gottman's Meta-Emotion Philosophy (1996)<br><span style="font-size:.78rem;color:#8899b4">Your attitude toward emotions determines regulation | 你对情绪的态度决定调节效果</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+        <div style="padding:1.2rem;border-radius:12px;background:linear-gradient(135deg,#1b5e20,#2e7d32);border:2px solid #4caf50">
+          <div style="font-size:.92rem;font-weight:700;color:#a5d6a7;margin-bottom:.5rem">&#10003; Emotion-Coaching | 情绪觉察型</div>
+          <div style="font-size:.75rem;color:#81c784">Recognize &#8594; Name &#8594; Understand</div>
+          <div style="font-size:.75rem;color:#81c784">识别 &#8594; 命名 &#8594; 理解</div>
+          <div style="font-size:.72rem;color:#a5d6a7;margin-top:.5rem;padding:.5rem;background:#1b5e2080;border-radius:6px">"I notice I'm feeling anxious. What information is this carrying?"</div>
+        </div>
+        <div style="padding:1.2rem;border-radius:12px;background:linear-gradient(135deg,#b71c1c,#c62828);border:2px solid #e53935">
+          <div style="font-size:.92rem;font-weight:700;color:#ef9a9a;margin-bottom:.5rem">&#10007; Emotion-Dismissing | 情绪忽视型</div>
+          <div style="font-size:.75rem;color:#ef9a9a">Deny &#8594; Suppress &#8594; Avoid</div>
+          <div style="font-size:.75rem;color:#ef9a9a">否认 &#8594; 压抑 &#8594; 回避</div>
+          <div style="font-size:.72rem;color:#ef9a9a;margin-top:.5rem;padding:.5rem;background:#b71c1c80;border-radius:6px">"Don't overthink it. Just push through."</div>
+        </div>
+      </div>
+      <p style="margin-top:1rem;font-size:.78rem;text-align:center;color:#6c7a96">The <code>emotion</code> skill implements the coaching approach: emotions as data, not noise to suppress.</p>
+    </div>
+
+    <!-- Four Sides -->
+    <div class="theory-diagram" id="theory-foursides">
+      <div class="title">Schulz von Thun's Four-Sides Model (1981)<br><span style="font-size:.78rem;color:#8899b4">Every message has 4 layers | 每句话有四层信息</span></div>
+      <div class="four-sides">
+        <div class="fs-box c-cog" style="border-color:var(--c);background:var(--cb)">
+          <div class="fs-label" style="color:var(--ct)">Factual | 事实层</div>
+          <div class="fs-desc">What is said</div>
+        </div>
+        <div class="fs-box c-emo" style="border-color:var(--c);background:var(--cb)">
+          <div class="fs-label" style="color:var(--ct)">Self-Revelation | 自我揭示</div>
+          <div class="fs-desc">What the speaker reveals</div>
+        </div>
+        <div class="fs-center">&#128172; The Message | 一句话</div>
+        <div class="fs-box c-learn" style="border-color:var(--c);background:var(--cb)">
+          <div class="fs-label" style="color:var(--ct)">Relationship | 关系层</div>
+          <div class="fs-desc">How speaker views listener</div>
+        </div>
+        <div class="fs-box c-com" style="border-color:var(--c);background:var(--cb)">
+          <div class="fs-label" style="color:var(--ct)">Appeal | 诉求层</div>
+          <div class="fs-desc">What speaker wants listener to do</div>
+        </div>
+      </div>
+      <div class="example-box" style="margin-top:1rem">
+        <div class="label">Example: Boss says "你看着办" (Handle it yourself)</div>
+        <div class="desc" style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem;font-size:.72rem">
+          <span>Factual: Hand it over to you</span>
+          <span>Self-Revelation: I'm unsure / don't want responsibility</span>
+          <span>Relationship: You should read my mind</span>
+          <span>Appeal: Do it my way, but I won't say how</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Double Loop -->
+    <div class="theory-diagram" id="theory-doubleloop">
+      <div class="title">Argyris Double-Loop Learning (1978)<br><span style="font-size:.78rem;color:#8899b4">Question the model, not just the action | 质疑模型，而非仅修正行为</span></div>
+      <div class="loop-diagram">
+        <div class="loop-row">
+          <div class="loop-label">Single-Loop<br>单环学习</div>
+          <div class="loop-box loop-single">Action 行为</div>
+          <div style="color:#f9a825;font-weight:700">&#8594;</div>
+          <div class="loop-box loop-single">Outcome 结果</div>
+          <div style="color:#f9a825;font-weight:700">&#8594;</div>
+          <div class="loop-box loop-single">Fix Action 修正行为</div>
+        </div>
+        <div class="loop-arr-d">&#8595; go deeper</div>
+        <div class="loop-row">
+          <div class="loop-label">Double-Loop<br>双环学习</div>
+          <div class="loop-box loop-double">Mental Model 心智模型</div>
+          <div style="color:#f9a825;font-weight:700">&#8594;</div>
+          <div class="loop-box loop-double">Assumption 假设</div>
+          <div style="color:#f9a825;font-weight:700">&#8594;</div>
+          <div class="loop-box loop-double">Fix Model 修正模型</div>
+        </div>
+      </div>
+      <p style="margin-top:1rem;font-size:.78rem;text-align:center;color:#6c7a96">The <code>review</code> skill doesn't just ask "what went wrong" but "what belief was wrong."</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- DESIGN PHILOSOPHY -->
+<section id="design">
+  <div class="container">
+    <h2>Design Philosophy<span class="cn">设计哲学</span></h2>
+
+    <div class="design-grid">
+      <div class="design-card">
+        <div class="num">01</div>
+        <div class="d-title">Single File Architecture | 单文件架构</div>
+        <div class="d-desc">All 8 skills + controller in one SKILL.md. Users remember one command: <code>/metacog</code>. The router handles complexity; users describe their situation naturally.</div>
+      </div>
+      <div class="design-card">
+        <div class="num">02</div>
+        <div class="d-title">Bilingual Headers | 双语标题</div>
+        <div class="d-desc">All output sections use <code>### English | 中文</code>. English ensures LLM processing precision; Chinese provides intuitive understanding. Works for both audiences.</div>
+      </div>
+      <div class="design-card">
+        <div class="num">03</div>
+        <div class="d-title">Confidence Scoring | 置信度评分</div>
+        <div class="d-desc">Every output includes 1-10 score with justification. Directly combats Dunning-Kruger effect — forces calibration of certainty for both AI and user.</div>
+      </div>
+      <div class="design-card">
+        <div class="num">04</div>
+        <div class="d-title">Anti-Flattery Principle | 反媚原则</div>
+        <div class="d-desc">Every output must survive: "If I delete all compliments and chicken soup, what's left?" If nothing remains, the output failed. Substance is respect.</div>
+      </div>
+      <div class="design-card">
+        <div class="num">05</div>
+        <div class="d-title">Reusable Principles | 可复用原则</div>
+        <div class="d-desc">Every interaction extracts one transferable principle. The goal isn't solving one problem — it's giving you a tool that works across many problems.</div>
+      </div>
+      <div class="design-card">
+        <div class="num">06</div>
+        <div class="d-title">Academic Grounding | 学术根基</div>
+        <div class="d-desc">Not built on vibes. Every skill maps to peer-reviewed frameworks: Flavell, Kahneman, Gottman, Bateson, Argyris, Shinn. Theory drives design.</div>
+      </div>
+    </div>
+
+    <h3>Skill Differentiation | 技能区分</h3>
+    <p>Some skills seem similar. Here's how they differ:</p>
+
+    <table class="diff-table">
+      <tr><th></th><th>cognition 元认知</th><th>emotion 元情绪</th></tr>
+      <tr><td><strong>Target</strong></td><td>Thinking errors, logical bias</td><td>Emotional states, affective distortion</td></tr>
+      <tr><td><strong>Core Q</strong></td><td>"Is my reasoning valid?"</td><td>"What am I feeling? How does it bend judgment?"</td></tr>
+      <tr><td><strong>Anti-pattern</strong></td><td>"You're right" (flattery)</td><td>"Don't overthink it" (denial)</td></tr>
+    </table>
+
+    <table class="diff-table" style="margin-top:1.5rem">
+      <tr><th></th><th>structure 元结构</th><th>communication 元沟通</th></tr>
+      <tr><td><strong>Target</strong></td><td>Information architecture</td><td>Interpersonal dynamics</td></tr>
+      <tr><td><strong>Core Q</strong></td><td>"Is this organized clearly?"</td><td>"What is really being said here?"</td></tr>
+      <tr><td><strong>Anti-pattern</strong></td><td>"Everything matters" (flat)</td><td>"Just be honest" (naive)</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ANTI-PATTERNS -->
+<section id="antipatterns">
+  <div class="container">
+    <h2>Anti-Patterns<span class="cn">反模式</span></h2>
+    <p>These outputs are <strong>explicitly forbidden</strong> across all skills. 所有技能严禁以下输出模式：</p>
+
+    <div class="ap-grid">
+      <div class="ap-card">
+        <div class="ap-name">Flattery | 恭维</div>
+        <div class="bad">&#10007; "你能思考这个问题说明你很有自省力"</div>
+        <div class="good">&#10003; Jump straight to analysis</div>
+      </div>
+      <div class="ap-card">
+        <div class="ap-name">Chicken Soup | 鸡汤</div>
+        <div class="bad">&#10007; "相信自己，你一定可以的"</div>
+        <div class="good">&#10003; Give concrete executable steps</div>
+      </div>
+      <div class="ap-card">
+        <div class="ap-name">Hedging | 敷衍</div>
+        <div class="bad">&#10007; "这要看具体情况"</div>
+        <div class="good">&#10003; List key variables + conditional logic</div>
+      </div>
+      <div class="ap-card">
+        <div class="ap-name">Emotion Denial | 否认情绪</div>
+        <div class="bad">&#10007; "别想太多"</div>
+        <div class="good">&#10003; Name the emotion precisely, trace effects</div>
+      </div>
+      <div class="ap-card">
+        <div class="ap-name">Naive Advice | 天真建议</div>
+        <div class="bad">&#10007; "说实话就好了"</div>
+        <div class="good">&#10003; Analyze dynamics, give specific phrasing</div>
+      </div>
+      <div class="ap-card">
+        <div class="ap-name">Flattening | 扁平化</div>
+        <div class="bad">&#10007; "都很重要"</div>
+        <div class="good">&#10003; Explicit priority ranking</div>
+      </div>
+      <div class="ap-card">
+        <div class="ap-name">Hallucination | 幻觉填充</div>
+        <div class="bad">&#10007; Making up answers when info is missing</div>
+        <div class="good">&#10003; State what's missing, then ask</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- REFERENCES -->
+<section id="references">
+  <div class="container">
+    <h2>References<span class="cn">参考文献</span></h2>
+
+    <div class="ref-group">
+      <h4>Metacognition | 元认知</h4>
+      <div class="ref-item"><strong>Flavell, J. H.</strong> (1979). Metacognition and cognitive monitoring. <em>American Psychologist</em>, 34(10).</div>
+      <div class="ref-item"><strong>Schraw, G. & Dennison, R. S.</strong> (1994). Assessing metacognitive awareness. <em>Contemporary Educational Psychology</em>, 19(4).</div>
+      <div class="ref-item"><strong>Nelson, T. O. & Narens, L.</strong> (1990). Metamemory: A theoretical framework. <em>Psychology of Learning and Motivation</em>, 26.</div>
+    </div>
+
+    <div class="ref-group">
+      <h4>Decision Science | 决策科学</h4>
+      <div class="ref-item"><strong>Kahneman, D.</strong> (2011). <em>Thinking, Fast and Slow</em>. Farrar, Straus and Giroux.</div>
+      <div class="ref-item"><strong>Kahneman, D. & Tversky, A.</strong> (1979). Prospect theory. <em>Econometrica</em>, 47(2).</div>
+      <div class="ref-item"><strong>Klein, G.</strong> (2007). Performing a project premortem. <em>Harvard Business Review</em>, 85(9).</div>
+      <div class="ref-item"><strong>Kruger, J. & Dunning, D.</strong> (1999). Unskilled and unaware of it. <em>JPSP</em>, 77(6).</div>
+    </div>
+
+    <div class="ref-group">
+      <h4>Learning Science | 学习科学</h4>
+      <div class="ref-item"><strong>Ericsson, K. A. et al.</strong> (1993). Deliberate practice. <em>Psychological Review</em>, 100(3).</div>
+      <div class="ref-item"><strong>Feynman, R. P.</strong> (1985). <em>"Surely You're Joking, Mr. Feynman!"</em></div>
+    </div>
+
+    <div class="ref-group">
+      <h4>Meta-Emotion | 元情绪</h4>
+      <div class="ref-item"><strong>Gottman, J. M. et al.</strong> (1996). Parental meta-emotion philosophy. <em>Journal of Family Psychology</em>, 10(3).</div>
+      <div class="ref-item"><strong>Gross, J. J.</strong> (1998). Emotion regulation. <em>Review of General Psychology</em>, 2(3).</div>
+      <div class="ref-item"><strong>Slovic, P. et al.</strong> (2007). The affect heuristic. <em>European J. of Operational Research</em>, 177(3).</div>
+    </div>
+
+    <div class="ref-group">
+      <h4>Meta-Communication | 元沟通</h4>
+      <div class="ref-item"><strong>Bateson, G.</strong> (1972). <em>Steps to an Ecology of Mind</em>. University of Chicago Press.</div>
+      <div class="ref-item"><strong>Watzlawick, P. et al.</strong> (1967). <em>Pragmatics of Human Communication</em>. W. W. Norton.</div>
+      <div class="ref-item"><strong>Schulz von Thun, F.</strong> (1981). <em>Miteinander reden 1</em>. Rowohlt.</div>
+      <div class="ref-item"><strong>Rosenberg, M. B.</strong> (2003). <em>Nonviolent Communication</em> (2nd ed.).</div>
+    </div>
+
+    <div class="ref-group">
+      <h4>Organizational Learning & LLM | 组织学习与LLM</h4>
+      <div class="ref-item"><strong>Argyris, C. & Schon, D. A.</strong> (1978). <em>Organizational Learning</em>. Addison-Wesley.</div>
+      <div class="ref-item"><strong>Minto, B.</strong> (2009). <em>The Pyramid Principle</em> (3rd ed.). Pearson.</div>
+      <div class="ref-item"><strong>Shinn, N. et al.</strong> (2023). Reflexion: Language agents with verbal reinforcement learning. <em>NeurIPS 2023</em>.</div>
+    </div>
+
+    <div class="ref-group">
+      <h4>Reference Projects | 参考项目</h4>
+      <div class="ref-item"><a href="https://github.com/atscub/metacognition">atscub/metacognition</a> — KYL plugin for Claude Code</div>
+      <div class="ref-item"><a href="https://github.com/mattnowdev/thinking-partner">mattnowdev/thinking-partner</a> — 150+ mental models</div>
+      <div class="ref-item"><a href="https://github.com/langgptai/LangGPT">LangGPT</a> — Structured prompt framework (11,900 stars)</div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<section style="padding:2rem 0;text-align:center;border-top:1px solid #1f3460">
+  <div class="container">
+    <p style="font-size:.85rem;color:#6c7a96;font-style:italic">Think about your thinking. Learn about your learning. Decide about your deciding.</p>
+    <p style="font-size:.82rem;color:#4a5a7a;margin-top:.3rem">思考你的思考。学习你的学习。决定你的决定。</p>
+    <p style="font-size:.72rem;color:#37474f;margin-top:1rem"><a href="https://github.com/JimmyWangJimmy/metacog">GitHub</a> &middot; MIT License</p>
+  </div>
+</section>
+
+</div><!-- end .main -->
+
+<script>
+// Sidebar active state on scroll
+const sections = document.querySelectorAll('section[id], .theory-diagram[id], .skill-card[id]');
+const navLinks = document.querySelectorAll('.sidebar nav a');
+window.addEventListener('scroll', () => {
+  let current = '';
+  sections.forEach(s => {
+    if (window.scrollY >= s.offsetTop - 120) current = s.id;
+  });
+  navLinks.forEach(a => {
+    a.classList.remove('active');
+    if (a.getAttribute('href') === '#' + current) a.classList.add('active');
+  });
+});
+// Close sidebar on mobile when clicking a link
+navLinks.forEach(a => a.addEventListener('click', () => {
+  if (window.innerWidth <= 768) document.querySelector('.sidebar').classList.remove('open');
+}));
+</script>
+
+</body>
+</html>
